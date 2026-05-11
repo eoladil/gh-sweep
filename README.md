@@ -4,8 +4,8 @@ A simple tool to clean up failed and cancelled GitHub Action runs.
 
 ## Dependencies
 
-- GitHub CLI (gh): Required. Must be installed and authenticated (`gh auth login`).
-- fzf: Optional. Used for the interactive search menu. If missing, the script will offer to install it automatically via Homebrew or direct binary download.
+- [GitHub CLI (gh)](https://github.com/cli/cli): Required. Must be installed and authenticated (`gh auth login`).
+- [fzf](https://github.com/junegunn/fzf): Optional. Used for the interactive search menu. If missing, the script will offer to install it automatically via Homebrew or direct binary download.
 
 ## Installation
 
