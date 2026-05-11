@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+verify_gh_cli() {
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "Error: I cannot find the GitHub CLI (gh). Please install it first."
+        exit 1
+    fi
+}
+
+who_am_i() {
+    local user
+    user=$(gh api user -q .login 2>/dev/null)
+    if [[ -z "$user" ]]; then
+        echo "Error: You are not logged into GitHub. Please run 'gh auth login'."
+        exit 1
+    fi
+    echo "$user"
+}
+
+setup_fzf() {
+    if ! command -v fzf >/dev/null 2>&1; then
+        echo "The search tool 'fzf' is missing. Would you like me to install it for you? (y/n)"
+        read -p "> " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            if command -v brew >/dev/null 2>&1; then
+                echo "Installing fzf via Homebrew..."
+                brew install fzf
+            else
+                echo "Downloading the latest fzf binary to your local bin folder..."
+                mkdir -p "$HOME/.local/bin"
+                curl -L https://github.com/junegunn/fzf/releases/latest/download/fzf-$(uname -s | tr '[:upper:]' '[:lower:]')_amd64.tar.gz | tar -xz -C "$HOME/.local/bin"
+                export PATH="$HOME/.local/bin:$PATH"
+            fi
+        fi
+    fi
+}
+
+choose_repo() {
+    local user=$1
+    local repo_list
+    echo "Fetching your repositories..."
+    repo_list=$(gh repo list --limit 100 --json nameWithOwner --jq '.[].nameWithOwner')
+
+    if command -v fzf >/dev/null 2>&1; then
+        echo "$repo_list" | fzf --height 40% --reverse --header "Which repository should I clean?"
+    else
+        echo "Pick a repository number (or 0 to cancel):"
+        select choice in $repo_list; do
+            [[ -n "$choice" ]] && echo "$choice" && return
+            [[ "$REPLY" == "0" ]] && exit 0
+        done
+    fi
+}
+
+clean_up_actions() {
+    local repo=$1
+    local statuses=("failure" "cancelled")
+    
+    echo "Working on: $repo"
+    for status in "${statuses[@]}"; do
+        local ids
+        ids=$(gh run list -R "$repo" --status "$status" --limit 200 --json databaseId --jq '.[].databaseId')
+        
+        if [[ -n "$ids" ]]; then
+            echo "Removing $status runs..."
+            echo "$ids" | xargs -I{} gh run delete -R "$repo" {}
+            echo "Done with $status runs."
+        else
+            echo "No $status runs found."
+        fi
+    done
+}
+
+# Main process
+
+verify_gh_cli
+ME=$(who_am_i)
+setup_fzf
+
+TARGET_REPO=${1:-$(choose_repo "$ME")}
+
+[[ -z "$TARGET_REPO" ]] && exit 0
+
+if [[ "$TARGET_REPO" != *"/"* ]]; then
+    TARGET_REPO="$ME/$TARGET_REPO"
+fi
+
+clean_up_actions "$TARGET_REPO"
+echo "Cleanup finished."
