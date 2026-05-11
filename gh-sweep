@@ -72,8 +72,6 @@ clean_up_actions() {
     done
 }
 
-# Main process
-
 verify_gh_cli
 ME=$(who_am_i)
 setup_fzf
